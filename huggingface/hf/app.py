@@ -3,7 +3,7 @@ import streamlit as st
 from PIL import Image
 
 from langchain_core.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
+from langchain.chains.retrieval_qa import RetrievalQA
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_pinecone import Pinecone as LangchainPinecone
 
