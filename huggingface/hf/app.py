@@ -45,7 +45,7 @@ if st.session_state.get("clear_chat", False):
 # =========
 with st.sidebar:
     st.title("Chatbot usando OpenAI (ChatGPT)")
-    image = Image.open('src/conmebol.jpg')
+    image = Image.open('/workspaces/chatbot_despliegue/huggingface/hf/conmebol.jpg')#src/conmebol.jpg
     st.image(image, caption='Conmebol')
     st.markdown("""
         ### Propósito
