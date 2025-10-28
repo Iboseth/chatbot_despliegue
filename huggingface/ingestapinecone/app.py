@@ -1,25 +1,37 @@
 import os
-import pinecone
+# import pinecone
+from pinecone import Pinecone, ServerlessSpec
 import tiktoken
 from langchain.vectorstores import Pinecone
 from langchain.embeddings.openai import OpenAIEmbeddings
 
+# Configura la clave API de Pinecone en la variable de entorno
 api_key = os.environ["PINECONE_API_KEY"]
+os.environ["PINECONE_API_KEY"] = api_key
 
-env = "gcp-starter"
+# Nombre del índice que deseas crear
 index_name = "knowledge-base-eliminatorias"
+
+# Dimension del modelo, ajustado para Stable Diffusion
 dimension = 1536
 
-pinecone.init(api_key = api_key, environment = env)
+# Especificaciones del servidor donde se alojará el índice
+spec = ServerlessSpec(
+    cloud="aws",  # Ajusta según la nube que estés utilizando, "aws", "gcp", etc.
+    region="us-east-1"  # Asegúrate de que la región esté disponible en tu plan
+)
 
-if index_name not in pinecone.list_indexes():
+# Inicializa el cliente de Pinecone
+pinecone_client = Pinecone()
 
-    pinecone.create_index(
-        index_name, 
-        dimension = dimension
-    )
+# Crea un índice en Pinecone
+pinecone_client.create_index(
+    name=index_name, 
+    dimension=dimension,
+    spec=spec  # Incluye las especificaciones del servidor
+)
 
-    print("Index " + index_name + " creado con éxito en Pinecone")
+print("Index " + index_name + " creado con éxito en Pinecone")
 
 from langchain.document_loaders import WebBaseLoader
 from langchain.text_splitter import CharacterTextSplitter
