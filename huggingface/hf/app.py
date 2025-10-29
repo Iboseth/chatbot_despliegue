@@ -88,7 +88,7 @@ for message in st.session_state.messages:
 def generate_openai_pinecone_response(user_query: str) -> str:
     # Modelo: puedes cambiar a "gpt-4o-mini" (barato/rápido) o "gpt-4o" (mejor calidad)
     llm = ChatOpenAI(
-        model="gpt-4o-mini",
+        model="gpt-3.5-turbo", #gpt-4o-mini
         temperature=0.85,
     )
 
