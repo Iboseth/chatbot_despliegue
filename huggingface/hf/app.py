@@ -8,6 +8,7 @@ from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 
+
 # =====================
 # Configuración general
 # =====================
