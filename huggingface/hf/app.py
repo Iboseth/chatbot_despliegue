@@ -87,11 +87,7 @@ for message in st.session_state.messages:
 # Generar respuesta
 # ====================
 def generate_openai_pinecone_response(user_query: str) -> str:
-    # Modelo: puedes cambiar a "gpt-4o-mini" (barato/rápido) o "gpt-4o" (mejor calidad)
-    llm = ChatOpenAI(
-        model="gpt-3.5-turbo", #gpt-4o-mini
-        temperature=0.85,
-    )
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
 
     template = """Responde a la pregunta basada en el siguiente contexto.
 Si no puedes responder, di: "No lo sé, disculpa, puedes buscar en internet."
@@ -101,23 +97,21 @@ Contexto:
 
 Pregunta: {question}
 
-Respuesta (usa también emoticones si suma claridad):
+Respuesta (usa también emoticones si ayuda a la claridad):
 """
     prompt = PromptTemplate(
         input_variables=["context", "question"],
         template=template
     )
 
-    embeddings = OpenAIEmbeddings()
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-    # Con el SDK 3.x de Pinecone NO necesitas "environment".
-    # Solo asegúrate de que tu índice INDEX_NAME exista en el mismo proyecto de tu API key.
     vectorstore = PineconeVectorStore.from_existing_index(
-        index_name=INDEX_NAME,
+        index_name="knowledge-base-eliminatorias",
         embedding=embeddings
     )
 
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
 
     qa = RetrievalQA.from_chain_type(
         llm=llm,
@@ -127,11 +121,10 @@ Respuesta (usa también emoticones si suma claridad):
         chain_type_kwargs={"prompt": prompt}
     )
 
-    # En LC 0.2+ usa invoke({"query": ...})
-    out = qa.invoke({"query": user_query})
-    # El dict suele traer "result" y "source_documents"
-    # return out["result"] if isinstance(out, dict) and "result" in out else str(out)
-    return out["result"]
+    # ⚠️ Usa invoke en lugar de run
+    result = qa.invoke({"query": user_query})
+    return result["result"]
+
 
 # ====================
 # Interfaz principal
