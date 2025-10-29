@@ -1,29 +1,35 @@
+import os
 import streamlit as st
+from PIL import Image
+
+# LangChain (nueva organización de paquetes)
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
-from langchain_community.vectorstores import Pinecone as LangchainPinecone
-from PIL import Image
-import os
-
-# ========================
-# Configuración de claves
-# ========================
-openai_api_key = os.environ.get("OPENAI_API_KEY")
-pinecone_key = os.environ.get("PINECONE_API_KEY")
-pinecone_env = "us-east-1"
-index_name = "knowledge-base-eliminatorias"
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_pinecone import PineconeVectorStore
 
 # =====================
-# Configuración de app
+# Configuración general
 # =====================
 st.set_page_config(page_title="Chatbot usando ChatGPT", page_icon="⚽")
+
+# Toma las claves de variables de entorno o de st.secrets
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY") or st.secrets.get("PINECONE_API_KEY")
+
+# Exporta para los SDKs que las leen desde env
+if OPENAI_API_KEY:
+    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+if PINECONE_API_KEY:
+    os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
+
+# Nombre del índice existente en Pinecone (ya creado y poblado)
+INDEX_NAME = "knowledge-base-eliminatorias"
 
 # ====================
 # Mensaje de bienvenida
 # ====================
-msg_chatbot = """
+MSG_CHATBOT = """
 Soy un chatbot que te ayudará a conocer sobre las eliminatorias sudamericanas: 
 ### Puedo ayudarte con las siguientes preguntas:
 - ¿Quién es el líder en la tabla de posiciones?
@@ -33,11 +39,11 @@ Soy un chatbot que te ayudará a conocer sobre las eliminatorias sudamericanas:
 """
 
 # ======================
-# Reinicio de historial (antes de dibujar mensajes)
+# Reinicio de historial
 # ======================
 if st.session_state.get("clear_chat", False):
     st.session_state.clear_chat = False
-    st.session_state.messages = [{"role": "assistant", "content": msg_chatbot}]
+    st.session_state.messages = [{"role": "assistant", "content": MSG_CHATBOT}]
     st.rerun()
 
 # =========
@@ -45,25 +51,29 @@ if st.session_state.get("clear_chat", False):
 # =========
 with st.sidebar:
     st.title("Chatbot usando OpenAI (ChatGPT)")
-    image = Image.open('src/conmebol.jpg')
-    st.image(image, caption='Conmebol')
-    st.markdown("""
+    try:
+        image = Image.open("huggingface/hf/conmebol.jpg")
+        st.image(image, caption="Conmebol")
+    except Exception:
+        st.info("Sube la imagen en huggingface/hf/conmebol.jpg (opcional)")
+    st.markdown(
+        """
         ### Propósito
         Este chatbot utiliza una base de conocimiento (Pinecone) con información del sitio web de Marca.
-        Usa Langchain con ChatGPT de OpenAI.
+        Usa LangChain con ChatGPT de OpenAI.
         ### Fuentes 
         - Marca - (https://www.marca.com)
-    """)
-
+        """
+    )
     if st.button("🧹 Limpiar chat"):
         st.session_state.clear_chat = True
         st.rerun()
 
 # =======================
-# Inicializar historial si es necesario
+# Inicializar historial
 # =======================
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": msg_chatbot}]
+    st.session_state.messages = [{"role": "assistant", "content": MSG_CHATBOT}]
 
 # =======================
 # Mostrar historial
@@ -75,42 +85,51 @@ for message in st.session_state.messages:
 # ====================
 # Generar respuesta
 # ====================
-def generate_openai_pinecone_response(prompt_input):
+def generate_openai_pinecone_response(user_query: str) -> str:
+    # Modelo: puedes cambiar a "gpt-4o-mini" (barato/rápido) o "gpt-4o" (mejor calidad)
     llm = ChatOpenAI(
-        openai_api_key=openai_api_key,
-        model_name="gpt-3.5-turbo",
-        temperature=0.85
+        model="gpt-4o-mini",
+        temperature=0.85,
     )
 
     template = """Responde a la pregunta basada en el siguiente contexto.
-    Si no puedes responder, di: "No lo sé, disculpa, puedes buscar en internet."
-    Contexto:
-    {context}
-    Pregunta: {question}
-    Respuesta usando también emoticones:
-    """
+Si no puedes responder, di: "No lo sé, disculpa, puedes buscar en internet."
 
+Contexto:
+{context}
+
+Pregunta: {question}
+
+Respuesta (usa también emoticones si suma claridad):
+"""
     prompt = PromptTemplate(
         input_variables=["context", "question"],
         template=template
     )
 
-    embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+    embeddings = OpenAIEmbeddings()
 
-    vectorstore = LangchainPinecone.from_existing_index(
-        index_name=index_name,
+    # Con el SDK 3.x de Pinecone NO necesitas "environment".
+    # Solo asegúrate de que tu índice INDEX_NAME exista en el mismo proyecto de tu API key.
+    vectorstore = PineconeVectorStore.from_existing_index(
+        index_name=INDEX_NAME,
         embedding=embeddings
     )
 
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
+
     qa = RetrievalQA.from_chain_type(
         llm=llm,
-        chain_type='stuff',
-        retriever=vectorstore.as_retriever(),
-        verbose=True,
+        chain_type="stuff",
+        retriever=retriever,
+        verbose=False,
         chain_type_kwargs={"prompt": prompt}
     )
 
-    return qa.run(prompt_input)
+    # En LC 0.2+ usa invoke({"query": ...})
+    out = qa.invoke({"query": user_query})
+    # El dict suele traer "result" y "source_documents"
+    return out["result"] if isinstance(out, dict) and "result" in out else str(out)
 
 # ====================
 # Interfaz principal
@@ -124,7 +143,6 @@ if prompt:
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Esperando respuesta..."):
-            response = generate_openai_pinecone_response(prompt)
-            placeholder = st.empty()
-            placeholder.markdown(response)
+            response = generate_openai_pinecone_response(st.session_state.messages[-1]["content"])
+            st.write(response)
             st.session_state.messages.append({"role": "assistant", "content": response})
