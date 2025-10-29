@@ -117,7 +117,7 @@ Respuesta (usa también emoticones si suma claridad):
         embedding=embeddings
     )
 
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
 
     qa = RetrievalQA.from_chain_type(
         llm=llm,
@@ -130,7 +130,8 @@ Respuesta (usa también emoticones si suma claridad):
     # En LC 0.2+ usa invoke({"query": ...})
     out = qa.invoke({"query": user_query})
     # El dict suele traer "result" y "source_documents"
-    return out["result"] if isinstance(out, dict) and "result" in out else str(out)
+    # return out["result"] if isinstance(out, dict) and "result" in out else str(out)
+    return out["result"]
 
 # ====================
 # Interfaz principal
