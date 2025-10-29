@@ -1,17 +1,18 @@
 import streamlit as st
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
-from langchain_community.vectorstores import Pinecone as LangchainPinecone
 from PIL import Image
 import os
+
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_pinecone import PineconeVectorStore  # nombre actual
+from langchain_core.prompts import PromptTemplate
+from langchain.chains import RetrievalQA
+
 
 # ========================
 # Configuración de claves
 # ========================
-openai_api_key = os.environ.get("OPENAI_API_KEY")
-pinecone_key = os.environ.get("PINECONE_API_KEY")
+openai_api_key = st.secrets["OPENAI_API_KEY"]
+pinecone_key = st.secrets["PINECONE_API_KEY"]
 pinecone_env = "us-east-1"
 index_name = "knowledge-base-eliminatorias"
 
@@ -97,7 +98,7 @@ def generate_openai_pinecone_response(prompt_input):
 
     embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 
-    vectorstore = LangchainPinecone.from_existing_index(
+    vectorstore = PineconeVectorStore.from_existing_index(
         index_name=index_name,
         embedding=embeddings
     )
@@ -110,7 +111,10 @@ def generate_openai_pinecone_response(prompt_input):
         chain_type_kwargs={"prompt": prompt}
     )
 
-    return qa.run(prompt_input)
+    #return qa.run(prompt_input)
+    result = qa.invoke({"query": prompt_input})
+    return result if isinstance(result, str) else result.get("result", "")
+
 
 # ====================
 # Interfaz principal
